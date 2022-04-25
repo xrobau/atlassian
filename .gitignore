@@ -1,0 +1,5 @@
+.buildnumber
+.lastbuild
+.docker_*
+.push_*
+.tag_*

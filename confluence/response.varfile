@@ -1,0 +1,10 @@
+# install4j response file for Confluence 7.17.1
+app.install.service$Boolean=false
+existingInstallationDir=/tmp/invalid
+launch.application$Boolean=false
+sys.adminRights$Boolean=true
+sys.confirmedUpdateInstallationString=false
+sys.installationDir=/opt/atlassian/confluence
+sys.languageId=en
+
+

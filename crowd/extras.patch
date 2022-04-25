@@ -1,0 +1,82 @@
+diff -ur orig/com/atlassian/extras/decoder/v2/Version2LicenseDecoder.java patched/com/atlassian/extras/decoder/v2/Version2LicenseDecoder.java
+--- orig/com/atlassian/extras/decoder/v2/Version2LicenseDecoder.java	2022-04-21 02:33:30.000000000 +0000
++++ patched/com/atlassian/extras/decoder/v2/Version2LicenseDecoder.java	2022-04-21 22:32:53.982233272 +0000
+@@ -16,11 +16,11 @@
+ import java.io.StringWriter;
+ import java.nio.charset.StandardCharsets;
+ import java.text.SimpleDateFormat;
++import java.util.Base64;
+ import java.util.Date;
+ import java.util.Properties;
+ import java.util.zip.Inflater;
+ import java.util.zip.InflaterInputStream;
+-import org.apache.commons.codec.binary.Base64;
+ 
+ public class Version2LicenseDecoder extends AbstractLicenseDecoder {
+    public static final int VERSION_NUMBER_1 = 1;
+@@ -68,7 +68,7 @@
+       byte[] zippedLicenseBytes = this.checkAndGetLicenseText(encodedLicenseTextAndHash);
+       Reader licenseText = this.unzipText(zippedLicenseBytes);
+       Properties properties = this.loadLicenseConfiguration(licenseText);
+-      if (this.verifyLicenseHash) {
++      if (false) {
+          this.verifyLicenseHash(properties);
+       }
+ 
+@@ -102,19 +102,14 @@
+          if (keyVersion == null) {
+             throw new LicenseVerificationException(LicenseVerificationException.VerificationFailureReason.MISSING_PROPERTY, "keyVersion", properties);
+          } else {
+-            boolean verified;
+             try {
+                StringWriter out = new StringWriter();
+                (new DefaultPropertiesPersister()).store(clonedProps, out, (String)null, true);
+-               String encodedProps = new String(Base64.encodeBase64(out.toString().getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+-               verified = KeyManager.getInstance().verify(encodedProps, licenseHash, keyVersion);
++               String encodedProps = new String(Base64.getEncoder().encode(out.toString().getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
++               KeyManager.getInstance().verify(encodedProps, licenseHash, keyVersion);
+             } catch (Exception var8) {
+                throw new LicenseVerificationException(LicenseVerificationException.VerificationFailureReason.ERROR_DURING_VERIFICATION, properties, var8);
+             }
+-
+-            if (!verified) {
+-               throw new LicenseVerificationException(LicenseVerificationException.VerificationFailureReason.VERIFICATION_FAILED, properties);
+-            }
+          }
+       }
+    }
+@@ -143,7 +138,7 @@
+ 
+    private byte[] checkAndGetLicenseText(String licenseContent) {
+       try {
+-         byte[] decodedBytes = Base64.decodeBase64(licenseContent.getBytes(StandardCharsets.UTF_8));
++         byte[] decodedBytes = Base64.getDecoder().decode(licenseContent.getBytes(StandardCharsets.UTF_8));
+          ByteArrayInputStream in = new ByteArrayInputStream(decodedBytes);
+          DataInputStream dIn = new DataInputStream(in);
+          int textLength = dIn.readInt();
+@@ -151,13 +146,9 @@
+          dIn.read(licenseText);
+          byte[] hash = new byte[dIn.available()];
+          dIn.read(hash);
+-         String encodedLicenseText = new String(Base64.encodeBase64(licenseText), StandardCharsets.UTF_8);
+-         String encodedHash = new String(Base64.encodeBase64(hash), StandardCharsets.UTF_8);
+-         if (!KeyManager.getInstance().verify(encodedLicenseText, encodedHash, "LICENSE_STRING_KEY_V2")) {
+-            throw new LicenseException("Failed to verify the license.");
+-         } else {
+-            return licenseText;
+-         }
++         new String(Base64.getEncoder().encode(licenseText), StandardCharsets.UTF_8);
++         new String(Base64.getEncoder().encode(hash), StandardCharsets.UTF_8);
++         return licenseText;
+       } catch (Exception var10) {
+          throw new LicenseException(var10);
+       }
+@@ -198,7 +189,7 @@
+          dOut.write(text);
+          dOut.write(hash);
+          byte[] allData = out.toByteArray();
+-         String result = (new String(Base64.encodeBase64(allData), StandardCharsets.UTF_8)).trim();
++         String result = (new String(Base64.getEncoder().encode(allData), StandardCharsets.UTF_8)).trim();
+          result = result + 'X' + "0" + 2 + Integer.toString(result.length(), 31);
+          result = split(result);
+          return result;
