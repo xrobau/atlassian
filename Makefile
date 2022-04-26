@@ -1,3 +1,5 @@
+PROJECT=atlassian
+
 JIRA_VERSION=8.22.2
 JIRA_FILE=atlassian-jira-software-$(JIRA_VERSION)-x64.bin
 JIRA_URL=https://product-downloads.atlassian.com/software/jira/downloads/$(JIRA_FILE)
@@ -20,20 +22,47 @@ BB_ARGS=--build-arg VERSION=$(BB_VERSION) --build-arg FILE=$(BB_FILE) --build-ar
 
 VOLUMES=-v $(shell pwd)/debug:/usr/local/debug
 
+COMPOSERVERSION=1.29.2
+DOCKERFILE=docker-compose.yml
+
+# Default container to tail or enter when 'make start' or 'make shell' is run
+DEFAULT=crowd
+
+# Simply to identify the build if multiple people are
+# working on it. If you're not me, you can ignore this.
+USERNAME=atlassian
+
 .PHONY: help
-help:
+help: | setup
 	@echo "This builds the entire Atlassian Ecosystem as docker containers."
 	@echo "If you're xrobau, you can also use 'make push' to send it to dockerhub."
+	@echo "Also run 'make psql' to launch psql and 'make creates' to generate the"
+	@echo "sql create database commands (Generates a random password on first use)"
+
+.PHONY: setup
+setup: /usr/bin/docker-compose-$(COMPOSERVERSION) /usr/bin/uuid /usr/local/bin/dive
+
+.PHONY: start
+start: | setup
+	@/usr/bin/docker-compose -f $(DOCKERFILE) -p $(PROJECT) up --detach
+	docker logs --tail 100 -f $(PROJECT)_$(DEFAULT)_1
+
+.PHONY: psql
+psql: | setup
+	@/usr/bin/docker-compose -f $(DOCKERFILE) -p $(PROJECT) up --detach db || :
+	@docker exec -it ${PROJECT}_db_1 /usr/bin/psql
+
+.PHONY: stop
+stop: | setup
+	@/usr/bin/docker-compose -f $(DOCKERFILE) -p $(PROJECT) down || :
+
+.PHONY: shell
+shell: | setup
+	@docker exec -it $(PROJECT)_$(DEFAULT)_1 bash
+
 
 .PHONY: build
-build: /usr/local/bin/dive jira crowd confluence bitbucket
-
-# If you apt-get remove dive, it can occasonally delete /usr/local/bin.
-# Be warned.
-DIVE=0.9.2
-/usr/local/bin/dive:
-	mkdir -p /usr/local/bin
-	cd /usr/local/bin && wget https://github.com/wagoodman/dive/releases/download/v$(DIVE)/dive_$(DIVE)_linux_amd64.deb &&  apt install ./dive_$(DIVE)_linux_amd64.deb
+build: jira crowd confluence bitbucket | setup
 
 .docker_base_build: $(wildcard base/*)
 	@docker build --tag atlassian-base:latest base/
@@ -65,9 +94,28 @@ bitbucket: .docker_bb_build_$(BB_VERSION)
 	@touch $@
 
 
-# Simply to identify the build if multiple people are
-# working on it. If you're not me, you can ignore this.
-USERNAME=atlassian
+creates: .create_crowd .create_jira .create_confluence .create_bitbucket
+	@cat .create_crowd
+	@cat .create_jira
+	@cat .create_confluence
+	@cat .create_bitbucket
+
+genpass = $(shell echo $$(cat .uuid).$(1) | md5sum | cut -c1-16)
+
+define genbase
+	@echo "# Create for $(1) generated at $(shell date)" > .create_$(1)
+	@echo "CREATE USER $(1)user WITH PASSWORD '$(call genpass,$(1))';" >> .create_$(1)
+	@echo "CREATE DATABASE $(1)db WITH ENCODING 'utf8' LC_COLLATE 'en_US.utf8' LC_CTYPE 'en_US.utf8' TEMPLATE template0;" >> .create_$(1)
+	@echo "GRANT ALL PRIVILEGES ON DATABASE $(1)db TO $(1)user;" >> .create_$(1)
+	@echo "" >> .create_$(1)
+endef
+
+.create_%: .uuid
+	@echo "Generating create for $* (This will only happen once)"
+	$(call genbase,$*)
+
+.uuid:
+	/usr/bin/uuid > $@
 
 .PHONY: getrv
 getrv: .lastbuild .buildnumber
@@ -138,4 +186,19 @@ push: .push_base .push_bb .push_conf .push_jira .push_crowd
 .push_crowd: .tag_crowd_$(CROWD_VERSION)
 	@docker push xrobau/patched-crowd:$(CROWD_VERSION)
 	@touch $@
+
+/usr/bin/docker-compose-$(COMPOSERVERSION):
+	@curl -s -L "https://github.com/docker/compose/releases/download/$(COMPOSERVERSION)/docker-compose-$(shell uname -s)-$(shell uname -m)" -o $@
+	@chmod 755 $@
+	@rm -f /usr/bin/docker-compose
+	@ln -s $@ /usr/bin/docker-compose
+
+/usr/bin/uuid:
+	apt-get -y install uuid
+
+DIVE=0.9.2
+/usr/local/bin/dive:
+	# If you apt-get remove dive, it can occasonally delete /usr/local/bin.
+	mkdir -p /usr/local/bin
+	cd /usr/local/bin && wget https://github.com/wagoodman/dive/releases/download/v$(DIVE)/dive_$(DIVE)_linux_amd64.deb &&  apt install ./dive_$(DIVE)_linux_amd64.deb
 

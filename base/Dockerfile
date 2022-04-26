@@ -1,5 +1,5 @@
 FROM openjdk:11-jdk-bullseye
-MAINTAINER Rob Thomas <xrobau@gmail.com>
+LABEL org.opencontainers.image.authors="Rob Thomas <xrobau@gmail.com>"
 
 ARG LANG_LANGUAGE=en
 ARG LANG_COUNTRY=US

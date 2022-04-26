@@ -3,3 +3,5 @@
 .docker_*
 .push_*
 .tag_*
+.create_*
+.uuid

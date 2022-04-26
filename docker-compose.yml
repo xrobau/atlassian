@@ -1,0 +1,86 @@
+services:
+  db:
+    image: postgres:12
+    environment:
+      - "POSTGRES_USER=root"
+      - "POSTGRES_PASSWORD=yeahnah"
+      - "PGDATA=/var/lib/postgresql/data"
+    volumes:
+      - pgvol:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  crowd:
+    image: crowd:4.4.1
+    environment:
+      - "JAVA_OPTS=-Xms512m -Xmx2048m"
+      - "CROWD_URL=http://localhost:8095"
+      - "SPLASH_CONTEXT="
+      - "CROWD_CONTEXT=ROOT"
+      - "DEMO_CONTEXT="
+      - "CROWDID_CONTEXT="
+      - "OPENID_CLIENT_CONTEXT="
+      - "CROWD_PROXY_NAME=sso.xrob.au"
+      - "CROWD_PROXY_PORT=443"
+      - "CROWD_PROXY_SCHEME=https"
+    volumes:
+      - crowdvol:/var/atlassian/crowd
+# Crowd needs source IPs of incoming connections, so
+# it can not use docker networking. Only port 8095 should
+# be exposed by the container.
+    network_mode: "host"
+
+  jira:
+    image: jira:8.22.2
+    environment:
+      - "CATALINA_OPTS=-Djira.downgrade.allowed=false"
+      - "JAVA_OPTS=-Xms512m -Xmx2048m"
+      - "JIRA_PROXY_NAME=bugs.xrob.au"
+      - "JIRA_PROXY_PORT=443"
+      - "JIRA_PROXY_SCHEME=https"
+    volumes:
+      - jiravol:/var/atlassian/jira
+    ports:
+      - "8080:8080"
+
+  confluence:
+    image: confluence:7.17.1
+    environment:
+      - "CONFLUENCE_PROXY_NAME=wiki.xrob.au"
+      - "CONFLUENCE_PROXY_PORT=443"
+      - "CONFLUENCE_PROXY_SCHEME=https"
+      - "JAVA_OPTS=-Xms512m -Xmx4g"
+    volumes:
+      - confvol:/var/atlassian/confluence
+    ports:
+      - "8090:8090"
+      - "8091:8091"
+
+  bitbucket:
+    image: bitbucket:7.21.0
+    environment:
+      - "BITBUCKET_PROXY_NAME=git.xrob.au"
+      - "BITBUCKET_PROXY_PORT=443"
+      - "BITBUCKET_PROXY_SCHEME=https"
+      - "BITBUCKET_EMBEDDED_SEARCH=true"
+      - "JAVA_OPTS=-Xms512m -Xmx4g"
+    volumes:
+      - bbvol:/var/atlassian/bitbucket
+    ports:
+      - "7990:7990"
+      - "7999:7999"
+
+volumes:
+  pgvol:
+  crowdvol:
+  jiravol:
+  confvol:
+  bbvol:
+
+networks:
+  hostmapped:
+    external:
+      name: "host"
+
+
+

@@ -29,7 +29,8 @@ ENV CROWD_URL=http://localhost:8095/crowd \
     CROWD_INSTALL=${CROWD_INSTALL} \
     CROWD_PROXY_NAME=sso.xrob.au \
     CROWD_PROXY_PORT=443 \
-    CROWD_PROXY_SCHEME=https
+    CROWD_PROXY_SCHEME=https \
+    CROWD_HOME=${CROWD_HOME}
 
 WORKDIR /var/atlassian/crowd
 VOLUME /var/atlassian/crowd
@@ -48,7 +49,7 @@ RUN mkdir -p ${CROWD_INSTALL}/crowd-webapp/WEB-INF/classes && \
     cp /usr/local/mysql-connector-java-*-bin.jar \
       ${CROWD_INSTALL}/apache-tomcat/lib/ && \
     mv ${CROWD_INSTALL}/apache-tomcat/webapps/ROOT ${CROWD_INSTALL}/splash-webapp && \
-    mv ${CROWD_INSTALL}/apache-tomcat/conf/Catalina/localhost ${CROWD_INSTALL}/webapps && \
+    mv ${CROWD_INSTALL}/apache-tomcat/conf/Catalina/localhost/* ${CROWD_INSTALL}/webapps && \
     mkdir -p ${CROWD_INSTALL}/apache-tomcat/conf/Catalina/localhost && \
     chown -R 1000.1000 ${CROWD_INSTALL}
 
