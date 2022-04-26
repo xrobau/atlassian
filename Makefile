@@ -68,6 +68,9 @@ build: jira crowd confluence bitbucket | setup
 	@docker build --tag atlassian-base:latest base/
 	@touch $@
 
+base-shell: .docker_base_build
+	@docker run --rm -it atlassian-base:latest /bin/bash
+
 .PHONY: jira
 jira: .docker_jira_build_$(JIRA_VERSION)
 

@@ -26,5 +26,7 @@ RUN apt-get update && apt-get -y upgrade && \
 
 COPY patch.sh /usr/local/bin
 
+RUN echo "bind 'set enable-bracketed-paste off'" >> /etc/bash.bashrc
+RUN sed -i 's/mouse=a/mouse=/' /usr/share/vim/*/*.vim
 CMD ["/bin/bash"]
 
