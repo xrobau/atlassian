@@ -77,10 +77,11 @@ volumes:
   confvol:
   bbvol:
 
-networks:
-  hostmapped:
-    external:
-      name: "host"
+# In a swarm, you want to use this for crowd
+#networks:
+#  hostmapped:
+#    external:
+#      name: "host"
 
 
 

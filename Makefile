@@ -1,46 +1,95 @@
-PROJECT=atlassian
+# Things you may want to change:
+#   Suffix of the tag used when pushing to the docker hub
+TAGSUFFIX=-1
+
+# Prefix for the dockerhub. If you're pushing to your own, change
+# this - eg if you use HUBDEST=hub.example.com/awesome the
+# tags will be:
+#    hub.example.com/awesome/jira-patched:8.22.2-1
+# (Assuming TAGSUFFIX is -1 and JIRA_VERSION is 8.22.2)
+HUBDEST=xrobau
+
+# Default container to tail or enter when 'make start' or 'make shell' is run
+DEFAULT=crowd
 
 JIRA_VERSION=8.22.2
+CROWD_VERSION=4.4.1
+CONF_VERSION=7.17.1
+BB_VERSION=7.21.0
+
 JIRA_FILE=atlassian-jira-software-$(JIRA_VERSION)-x64.bin
 JIRA_URL=https://product-downloads.atlassian.com/software/jira/downloads/$(JIRA_FILE)
 JIRA_ARGS=--build-arg JIRA_VERSION=$(JIRA_VERSION) --build-arg JIRA_FILE=$(JIRA_FILE) --build-arg JIRA_URL=$(JIRA_URL)
 
-CROWD_VERSION=4.4.1
 CROWD_FILE=atlassian-crowd-$(CROWD_VERSION).tar.gz
 CROWD_SRCURL=https://product-downloads.atlassian.com/software/crowd/downloads/$(CROWD_FILE)
 CROWD_ARGS=--build-arg CROWD_VERSION=$(CROWD_VERSION) --build-arg CROWD_FILE=$(CROWD_FILE) --build-arg CROWD_SRCURL=$(CROWD_SRCURL)
 
-CONF_VERSION=7.17.1
 CONF_FILE=atlassian-confluence-$(CONF_VERSION)-x64.bin
 CONF_SRCURL=https://product-downloads.atlassian.com/software/confluence/downloads/$(CONF_FILE)
 CONF_ARGS=--build-arg VERSION=$(CONF_VERSION) --build-arg FILE=$(CONF_FILE) --build-arg SRCURL=$(CONF_SRCURL) --build-arg PKG=confluence
 
-BB_VERSION=7.21.0
 BB_FILE=atlassian-bitbucket-$(BB_VERSION)-x64.bin
 BB_SRCURL=https://product-downloads.atlassian.com/software/stash/downloads/$(BB_FILE)
 BB_ARGS=--build-arg VERSION=$(BB_VERSION) --build-arg FILE=$(BB_FILE) --build-arg SRCURL=$(BB_SRCURL) --build-arg PKG=bitbucket
+
+# You probably don't want to change these, unless you're debugging
+# stuff that is strangely broken.
+#
+# Unique identifier used with docker-compose
+PROJECT=atlassian
+# Simply to identify the build if multiple people are
+# working on it. If you're not me, you can ignore this.
+USERNAME=atlassian
 
 VOLUMES=-v $(shell pwd)/debug:/usr/local/debug
 
 COMPOSERVERSION=1.29.2
 DOCKERFILE=docker-compose.yml
-
-# Default container to tail or enter when 'make start' or 'make shell' is run
-DEFAULT=crowd
-
-# Simply to identify the build if multiple people are
-# working on it. If you're not me, you can ignore this.
-USERNAME=atlassian
+SHELL=/bin/bash
 
 .PHONY: help
 help: | setup
 	@echo "This builds the entire Atlassian Ecosystem as docker containers."
-	@echo "If you're xrobau, you can also use 'make push' to send it to dockerhub."
-	@echo "Also run 'make psql' to launch psql and 'make creates' to generate the"
-	@echo "sql create database commands (Generates a random password on first use)"
+	@echo "  make build      Builds/updates every container"
+	@echo "  make start      Starts all containers using example compose file"
+	@echo "  make stop       Stops all containers created by example compose file"
+	@echo "  make psql       Starts Postgres container and runs psql"
+	@echo "  make creates    Generate SQL CREATE commands to paste into psql"
+	@echo "       Note this generates a random password for each service on"
+	@echo "       first run, and keeps it. To change the password source nonce,"
+	@echo "       delete the .uuid file."
+	@echo "  make push       If you're xrobau, this will tag everything and send"
+	@echo "       it to dockerhub. If you're NOT xrobau, edit HUBDEST in this"
+	@echo "       Makefile to change the destination"
+	@echo "  make clean      Deletes all temp files APART FROM password nonce"
+	@echo "       If you want to regen your passwords, delete the .uuid file too"
+	@echo "  make nuke       Stops all containers, deletes all temp files, and then"
+	@echo "       deletes all local volumes. If you were wondering what a catastrophic"
+	@echo "       data loss looks like, this is a great way to simulate everything"
+	@echo "       being cryptolocked or rm -rf'ed. Don't do this unless you're CERTAIN"
+	@echo "       THAT YOU WANT TO DELETE EVERYTHING PERMANENTLY"
 
 .PHONY: setup
 setup: /usr/bin/docker-compose-$(COMPOSERVERSION) /usr/bin/uuid /usr/local/bin/dive
+
+.PHONY: clean
+clean:
+	@echo -n "Cleaning: "; \
+		for f in .docker_* .push_* .tag_*; do \
+			[ -e $$f ] && (echo -n "$$f "; rm -f $$f); \
+		done; \
+		echo ""
+.PHONY: nuke
+nuke: stop clean
+	@read -e -p "Are you certain you want to delete all persistant data? [yN] " p; \
+		R=$$(echo $$p | tr '[:upper:]' '[:lower:]' | cut -c1); \
+                if [ "$$R" == "y" ]; then \
+			for v in $(shell docker volume ls -q | grep ^$(PROJECT)); do \
+				echo "Nuking $$v"; \
+				docker volume rm $$v; \
+			done; \
+		fi
 
 .PHONY: start
 start: | setup
@@ -59,7 +108,6 @@ stop: | setup
 .PHONY: shell
 shell: | setup
 	@docker exec -it $(PROJECT)_$(DEFAULT)_1 bash
-
 
 .PHONY: build
 build: jira crowd confluence bitbucket | setup
@@ -95,7 +143,6 @@ bitbucket: .docker_bb_build_$(BB_VERSION)
 .docker_bb_build_$(BB_VERSION): .docker_base_build $(wildcard bitbucket/*)
 	@docker build $(BB_ARGS) --tag bitbucket:$(BB_VERSION) bitbucket/
 	@touch $@
-
 
 creates: .create_crowd .create_jira .create_confluence .create_bitbucket
 	@cat .create_crowd
@@ -145,49 +192,49 @@ push: .push_base .push_bb .push_conf .push_jira .push_crowd
 
 .tag_base: .lastbuild .buildnumber .docker_base_build
 	$(eval RELEASE=$(USERNAME)-$(shell cat .lastbuild)-$(shell cat .buildnumber))
-	@echo Tagging xrobau/atlassian-base:$(RELEASE)
-	@docker tag atlassian-base:latest xrobau/atlassian-base:$(RELEASE)
+	@echo Tagging $(HUBDEST)/atlassian-base:$(RELEASE)$(TAGSUFFIX)
+	@docker tag atlassian-base:latest $(HUBDEST)/atlassian-base:$(RELEASE)
 	@touch $@
 
 .push_base: .tag_base
 	$(eval RELEASE=$(USERNAME)-$(shell cat .lastbuild)-$(shell cat .buildnumber))
-	docker push xrobau/atlassian-base:$(RELEASE)
+	docker push $(HUBDEST)/atlassian-base:$(RELEASE)
 	touch $@
 
-.tag_bb_$(BB_VERSION): .docker_bb_build_$(BB_VERSION)
-	@echo Tagging xrobau/patched-bitbucket:$(BB_VERSION)
-	@docker tag bitbucket:$(BB_VERSION) xrobau/patched-bitbucket:$(BB_VERSION)
+.tag_bb_$(BB_VERSION)$(TAGSUFFIX): .docker_bb_build_$(BB_VERSION)
+	@echo Tagging $(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
+	@docker tag bitbucket:$(BB_VERSION) $(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
 	@touch $@
 
-.push_bb: .tag_bb_$(BB_VERSION)
-	@docker push xrobau/patched-bitbucket:$(BB_VERSION)
+.push_bb: .tag_bb_$(BB_VERSION)$(TAGSUFFIX)
+	@docker push $(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
 	@touch $@
 
-.tag_conf_$(CONF_VERSION): .docker_conf_build_$(CONF_VERSION)
-	@echo Tagging xrobau/patched-confluence:$(CONF_VERSION)
-	@docker tag confluence:$(CONF_VERSION) xrobau/patched-confluence:$(CONF_VERSION)
+.tag_conf_$(CONF_VERSION)$(TAGSUFFIX): .docker_conf_build_$(CONF_VERSION)
+	@echo Tagging $(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
+	@docker tag confluence:$(CONF_VERSION) $(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
 	@touch $@
 
-.push_conf: .tag_conf_$(CONF_VERSION)
-	@docker push xrobau/patched-confluence:$(CONF_VERSION)
+.push_conf: .tag_conf_$(CONF_VERSION)$(TAGSUFFIX)
+	@docker push $(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
 	@touch $@
 
-.tag_jira_$(JIRA_VERSION): .docker_jira_build_$(JIRA_VERSION)
-	@echo Tagging xrobau/patched-jira:$(JIRA_VERSION)
-	@docker tag jira:$(JIRA_VERSION) xrobau/patched-jira:$(JIRA_VERSION)
+.tag_jira_$(JIRA_VERSION)$(TAGSUFFIX): .docker_jira_build_$(JIRA_VERSION)
+	@echo Tagging $(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
+	@docker tag jira:$(JIRA_VERSION) $(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
 	@touch $@
 
-.push_jira: .tag_jira_$(JIRA_VERSION)
-	@docker push xrobau/patched-jira:$(JIRA_VERSION)
+.push_jira: .tag_jira_$(JIRA_VERSION)$(TAGSUFFIX)
+	@docker push $(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
 	@touch $@
 
-.tag_crowd_$(CROWD_VERSION): .docker_crowd_build_$(CROWD_VERSION)
-	@echo Tagging xrobau/patched-crowd:$(CROWD_VERSION)
-	@docker tag crowd:$(CROWD_VERSION) xrobau/patched-crowd:$(CROWD_VERSION)
+.tag_crowd_$(CROWD_VERSION)$(TAGSUFFIX): .docker_crowd_build_$(CROWD_VERSION)
+	@echo Tagging $(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
+	@docker tag crowd:$(CROWD_VERSION) $(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
 	@touch $@
 
-.push_crowd: .tag_crowd_$(CROWD_VERSION)
-	@docker push xrobau/patched-crowd:$(CROWD_VERSION)
+.push_crowd: .tag_crowd_$(CROWD_VERSION)$(TAGSUFFIX)
+	@docker push $(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
 	@touch $@
 
 /usr/bin/docker-compose-$(COMPOSERVERSION):
