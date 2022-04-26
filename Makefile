@@ -81,18 +81,19 @@ clean:
 		done; \
 		echo ""
 .PHONY: nuke
+# docker volume rm displays the volume it's deleting, which is handy
 nuke: stop clean
 	@read -e -p "Are you certain you want to delete all persistant data? [yN] " p; \
 		R=$$(echo $$p | tr '[:upper:]' '[:lower:]' | cut -c1); \
                 if [ "$$R" == "y" ]; then \
 			for v in $(shell docker volume ls -q | grep ^$(PROJECT)); do \
-				echo "Nuking $$v"; \
+				echo -n "Nuking "; \
 				docker volume rm $$v; \
 			done; \
 		fi
 
 .PHONY: start
-start: | setup
+start: build | setup
 	@/usr/bin/docker-compose -f $(DOCKERFILE) -p $(PROJECT) up --detach
 	docker logs --tail 100 -f $(PROJECT)_$(DEFAULT)_1
 
