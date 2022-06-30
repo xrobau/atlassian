@@ -12,10 +12,10 @@ HUBDEST=xrobau
 # Default container to tail or enter when 'make start' or 'make shell' is run
 DEFAULT=crowd
 
-JIRA_VERSION=8.22.3
+JIRA_VERSION=9.0.0
 CROWD_VERSION=5.0.0
-CONF_VERSION=7.18.1
-BB_VERSION=8.1.0
+CONF_VERSION=7.18.2
+BB_VERSION=8.2.0
 
 JIRA_FILE=atlassian-jira-software-$(JIRA_VERSION)-x64.bin
 JIRA_URL=https://product-downloads.atlassian.com/software/jira/downloads/$(JIRA_FILE)
