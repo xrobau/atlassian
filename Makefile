@@ -1,20 +1,27 @@
 # Things you may want to change:
-#   Suffix of the tag used when pushing to the docker hub
+#   Suffix of the tag used when pushing to the docker hub below
 TAGSUFFIX=-1
 
 # Prefix for the dockerhub. If you're pushing to your own, change
 # this - eg if you use HUBDEST=hub.example.com/awesome the
 # tags will be:
-#    hub.example.com/awesome/jira-patched:8.22.2-1
+#    hub.example.com/awesome/patched-jira:8.22.2-1
 # (Assuming TAGSUFFIX is -1 and JIRA_VERSION is 8.22.2)
+#
+# It will ALSO explicitly tag :latest too, which can then be used
+# for automated testing
 HUBDEST=xrobau
 
 # Default container to tail or enter when 'make start' or 'make shell' is run
 DEFAULT=crowd
 
+# https://www.atlassian.com/software/jira/core/download
 JIRA_VERSION=9.0.0
-CROWD_VERSION=5.0.0
+# https://www.atlassian.com/software/crowd/download-archive
+CROWD_VERSION=5.0.1
+# https://www.atlassian.com/software/confluence/download-archives
 CONF_VERSION=7.18.2
+# https://www.atlassian.com/software/bitbucket/download-archives
 BB_VERSION=8.2.0
 
 JIRA_FILE=atlassian-jira-software-$(JIRA_VERSION)-x64.bin
@@ -52,6 +59,12 @@ SHELL=/bin/bash
 help: | setup
 	@echo "This builds the entire Atlassian Ecosystem as docker containers."
 	@echo "  make build      Builds/updates every container"
+	@echo "  make refresh    Rebuilds the base container from scratch"
+	@echo "       This refreshes the base FROM image in base/Dockerfile, which"
+	@echo "       invalidates the cached child containers so they will be"
+	@echo "       completely updated on next 'make build'."
+	@echo "       This should be used semi-regularly to ensure everything is"
+	@echo "       up to date in both the OS and Java"
 	@echo "  make start      Starts all containers using example compose file"
 	@echo "  make stop       Stops all containers created by example compose file"
 	@echo "  make psql       Starts Postgres container and runs psql"
@@ -112,6 +125,14 @@ shell: | setup
 
 .PHONY: build
 build: jira crowd confluence bitbucket | setup
+
+.PHONY: refresh
+refresh:
+	@SRC=$$(awk '/FROM/ { print $$2 }' base/Dockerfile); \
+		echo Updating $$SRC; \
+		docker pull $$SRC; \
+		docker build --no-cache --tag atlassian-base:latest base/; \
+		touch .docker_base_build
 
 .docker_base_build: $(wildcard base/*)
 	@docker build --tag atlassian-base:latest base/
