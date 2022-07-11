@@ -19,14 +19,24 @@ RUN git clone https://github.com/fesh0r/fernflower /usr/local/fernflower && \
     cp build/libs/fernflower.jar /usr/local/bin/ && \
     cd / && rm -rf /usr/local/fernflower
 
-COPY bullseye-backports.list /etc/apt/sources.list.d
+# Atlassian pubkey for their SDK repo.
+# Annoyingly, the SOURCE URL of
+#   https://packages.atlassian.com/api/gpg/key/public
+# is mildly corrupt, with random spaces (and other things that
+# I stopped caring about). This has been manually fixed by
+# using apt-key add (which is more tolerant) to pull it in,
+# and then apt-key export B56C9565957495B9 to generate a
+# valid .asc file
+COPY atlassian-sdk-main.asc /etc/apt/trusted.gpg.d/
+
+COPY *.list /etc/apt/sources.list.d/
 
 # Now add all the things we want in the other packages
 # Note that git is installed from backports as bitbucket
 # wants something newer than 2.30 (which is currently in
 # stable)
 RUN apt-get update && apt-get -y upgrade && \
-    apt-get -y install patch bbe vim xmlstarlet net-tools && \
+    apt-get -y install patch bbe vim xmlstarlet net-tools atlassian-plugin-sdk && \
     apt-get -t bullseye-backports -y install git && \
     apt-get -y clean
 
