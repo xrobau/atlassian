@@ -13,7 +13,7 @@ RUN curl -L http://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-
 
 # Build fernflower
 RUN git clone https://github.com/fesh0r/fernflower /usr/local/fernflower && \
-    cd /usr/local/fernflower && \
+    cd /usr/local/fernflower && git checkout f16e194ee46e01ab60098b01f8df9fddb2ffaed3 && \
     ./gradlew build && \
     ./gradlew --stop && \
     cp build/libs/fernflower.jar /usr/local/bin/ && \
