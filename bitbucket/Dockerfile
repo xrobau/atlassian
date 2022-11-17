@@ -25,7 +25,8 @@ RUN wget ${SRCURL} -O /usr/local/${FILE} && \
 	su ${PKG} /bin/bash -c "/usr/local/${FILE} -q -varfile /usr/local/response.varfile" && \
 	rm -f /usr/local/${FILE} && \
 	/usr/local/bin/patch.sh && \
-	rm -f ${PKG_INSTALL}/lib/mysql-connector-java*.jar &&  \
+	rm -f ${PKG_INSTALL}/lib/mysql-connector-java*.jar && \
+	mkdir -p ${PKG_INSTALL}/lib && \
 	cp /usr/local/mysql-connector-java*jar ${PKG_INSTALL}/lib/
 
 EXPOSE 7990
