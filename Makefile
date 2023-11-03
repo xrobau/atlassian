@@ -13,7 +13,7 @@ TAGSUFFIX=-1
 HUBDEST=xrobau
 
 # Default container to tail or enter when 'make start' or 'make shell' is run
-DEFAULT=confluence
+DEFAULT=bitbucket
 
 # https://www.atlassian.com/software/jira/core/download
 JIRA_VERSION=9.11.2
@@ -121,7 +121,7 @@ stop: | setup
 
 .PHONY: shell
 shell: | setup
-	@docker exec -it $(PROJECT)_$(DEFAULT)_1 bash
+	@docker exec -it --user=0:0 $(PROJECT)_$(DEFAULT)_1 bash
 
 .PHONY: build
 build: jira crowd confluence bitbucket | setup
