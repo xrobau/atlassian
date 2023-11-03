@@ -1,6 +1,6 @@
 # Things you may want to change:
 #   Suffix of the tag used when pushing to the docker hub below
-TAGSUFFIX=-1
+TAGSUFFIX=-2
 
 # Prefix for the dockerhub. If you're pushing to your own, change
 # this - eg if you use HUBDEST=hub.example.com/awesome the
