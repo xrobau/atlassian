@@ -134,6 +134,45 @@ refresh:
 		docker build --no-cache --tag atlassian-base:latest base/; \
 		touch .docker_base_build
 
+# These are just variables to reduce typing futher down. There's
+# no reason to change them.
+BBTAGFILE=.tag_bb_$(BB_VERSION)$(TAGSUFFIX)
+BBBUILDFILE=.docker_bb_build_$(BB_VERSION)
+BBLOCAL=bitbucket:$(BB_VERSION)
+BBIMG=$(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
+
+CONFTAGFILE=.tag_conf_$(CONF_VERSION)$(TAGSUFFIX)
+CONFBUILDFILE=.docker_conf_build_$(CONF_VERSION)
+CONFLOCAL=confluence:$(CONF_VERSION)
+CONFIMG=$(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
+
+JIRATAGFILE=.tag_jira_$(JIRA_VERSION)$(TAGSUFFIX)
+JIRABUILDFILE=.docker_jira_build_$(JIRA_VERSION)
+JIRALOCAL=jira:$(JIRA_VERSION)
+JIRAIMG=$(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
+
+CROWDTAGFILE=.tag_crowd_$(CROWD_VERSION)$(TAGSUFFIX)
+CROWDBUILDFILE=.docker_crowd_build_$(CROWD_VERSION)
+CROWDLOCAL=crowd:$(CROWD_VERSION)
+CROWDIMG=$(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
+
+# If you want 'make start' to use the external tags, set this to something.
+# Otherwise it'll just use the local tags
+testexternal=
+ifdef testexternal
+DOCKERCOMPOSEREQS=$(BBTAGFILE) $(CONFTAGFILE) $(JIRATAGFILE) $(CROWDTAGFILE)
+DOCKERBB=$(BBIMG)
+DOCKERCONF=$(CONFIMG)
+DOCKERJIRA=$(JIRAIMG)
+DOCKERCROWD=$(CROWDIMG)
+else
+DOCKERCOMPOSEREQS=$(BBUILDFILE) $(CONFBUILDFILE) $(JIRABUILDFILE) $(CROWDBUILDFILE)
+DOCKERBB=$(BBLOCAL)
+DOCKERCONF=$(CONFLOCAL)
+DOCKERJIRA=$(JIRALOCAL)
+DOCKERCROWD=$(CROWDLOCAL)
+endif
+
 .docker_base_build: $(wildcard base/*)
 	@docker build --tag atlassian-base:latest base/
 	@touch $@
@@ -142,28 +181,27 @@ base-shell: .docker_base_build
 	@docker run --rm -it atlassian-base:latest /bin/bash
 
 .PHONY: jira
-jira: .docker_jira_build_$(JIRA_VERSION)
-
-.docker_jira_build_$(JIRA_VERSION): .docker_base_build $(wildcard jira/*)
-	@docker build $(JIRA_ARGS) --tag jira:$(JIRA_VERSION) jira/
+jira: $(JIRABUILDFILE)
+$(JIRABUILDFILE): .docker_base_build $(wildcard jira/*)
+	@docker build $(JIRA_ARGS) --tag $(JIRALOCAL) jira/
 	@touch $@
 
 .PHONY: crowd
-crowd: .docker_crowd_build_$(CROWD_VERSION)
-.docker_crowd_build_$(CROWD_VERSION): .docker_base_build $(wildcard crowd/*)
-	@docker build $(CROWD_ARGS) --tag crowd:$(CROWD_VERSION) crowd/
+crowd: $(CROWDBUILDFILE)
+$(CROWDBUILDFILE): .docker_base_build $(wildcard crowd/*)
+	@docker build $(CROWD_ARGS) --tag $(CROWDLOCAL) crowd/
 	@touch $@
 
 .PHONY: confluence
-confluence: .docker_conf_build_$(CONF_VERSION)
-.docker_conf_build_$(CONF_VERSION): .docker_base_build $(wildcard confluence/*)
-	@docker build $(CONF_ARGS) --tag confluence:$(CONF_VERSION) confluence/
+confluence: $(CONFBUILDFILE)
+$(CONFBUILDFILE): .docker_base_build $(wildcard confluence/*)
+	@docker build $(CONF_ARGS) --tag $(CONFLOCAL) confluence/
 	@touch $@
 
 .PHONY: bitbucket
-bitbucket: .docker_bb_build_$(BB_VERSION)
-.docker_bb_build_$(BB_VERSION): .docker_base_build $(wildcard bitbucket/*)
-	@docker build $(BB_ARGS) --tag bitbucket:$(BB_VERSION) bitbucket/
+bitbucket: $(BBBUILDFILE)
+$(BBBUILDFILE): .docker_base_build $(wildcard bitbucket/*)
+	@docker build $(BB_ARGS) --tag $(BBLOCAL) bitbucket/
 	@touch $@
 
 creates: .create_crowd .create_jira .create_confluence .create_bitbucket
@@ -209,24 +247,12 @@ increment-releasevar: .lastbuild .buildnumber
 
 prod: increment-releasevar push
 
-BBTAGFILE=.tag_bb_$(BB_VERSION)$(TAGSUFFIX)
-BBIMG=$(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
-
-CONFTAGFILE=.tag_conf_$(CONF_VERSION)$(TAGSUFFIX)
-CONFIMG=$(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
-
-JIRATAGFILE=.tag_jira_$(JIRA_VERSION)$(TAGSUFFIX)
-JIRAIMG=$(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
-
-CROWDTAGFILE=.tag_crowd_$(CROWD_VERSION)$(TAGSUFFIX)
-CROWDIMG=$(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
-
-docker-compose.yml: docker-compose.template.yml $(BBTAG) $(CONFTAG) $(JIRATAG) $(CROWDTAG)
+docker-compose.yml: docker-compose.template.yml $(DOCKERCOMPOSEREQS)
 	@sed \
-		-e 's!__BBIMG__!$(BBIMG)!' \
-		-e 's!__CONFIMG__!$(CONFIMG)!' \
-		-e 's!__JIRAIMG__!$(JIRAIMG)!' \
-		-e 's!__CROWDIMG__!$(CROWDIMG)!' < docker-compose.template.yml > $@
+		-e 's!__BBIMG__!$(DOCKERBB)!' \
+		-e 's!__CONFIMG__!$(DOCKERCONF)!' \
+		-e 's!__JIRAIMG__!$(DOCKERJIRA)!' \
+		-e 's!__CROWDIMG__!$(DOCKERCROWD)!' < docker-compose.template.yml > $@
 
 .PHONY: push
 push: .push_base .push_bb .push_conf .push_jira .push_crowd
@@ -242,36 +268,36 @@ push: .push_base .push_bb .push_conf .push_jira .push_crowd
 	docker push $(HUBDEST)/atlassian-base:$(RELEASE)
 	touch $@
 
-$(BBTAGFILE): .docker_bb_build_$(BB_VERSION)
+$(BBTAGFILE): $(BBUILDFILE)
 	@echo Tagging $(BBIMG)
-	@docker tag bitbucket:$(BB_VERSION) $(BBIMG)
+	@docker tag $(BBLOCAL) $(BBIMG)
 	@touch $@
 
 .push_bb: $(BBTAGFILE)
 	@docker push $(BBIMG)
 	@touch $@
 
-$(CONFTAGFILE): .docker_conf_build_$(CONF_VERSION)
+$(CONFTAGFILE): $(CONFBUILD)
 	@echo Tagging $(CONFIMG)
-	@docker tag confluence:$(CONF_VERSION) $(CONFIMG)
+	@docker tag $(CONFLOCAL) $(CONFIMG)
 	@touch $@
 
 .push_conf: $(CONFTAGFILE)
 	@docker push $(CONFIMG)
 	@touch $@
 
-$(JIRATAGFILE): .docker_jira_build_$(JIRA_VERSION)
+$(JIRATAGFILE): $(JIRABUILDFILE)
 	@echo Tagging $(JIRAIMG)
-	@docker tag jira:$(JIRA_VERSION) $(JIRAIMG)
+	@docker tag $(JIRALOCAL) $(JIRAIMG)
 	@touch $@
 
 .push_jira: $(JIRATAGFILE)
 	@docker push $(JIRAIMG)
 	@touch $@
 
-$(CROWDTAGFILE): .docker_crowd_build_$(CROWD_VERSION)
+$(CROWDTAGFILE): $(CROWDBUILD)
 	@echo Tagging $(CROWDIMG)
-	@docker tag crowd:$(CROWD_VERSION) $(CROWDIMG)
+	@docker tag $(CROWDLOCAL) $(CROWDIMG)
 	@touch $@
 
 .push_crowd: $(CROWDTAGFILE)
