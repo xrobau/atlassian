@@ -106,7 +106,7 @@ nuke: stop clean
 		fi
 
 .PHONY: start
-start: build | setup
+start: build docker-compose.yml | setup
 	@/usr/bin/docker-compose -f $(DOCKERFILE) -p $(PROJECT) up --detach
 	docker logs --tail 100 -f $(PROJECT)_$(DEFAULT)_1
 
@@ -209,6 +209,25 @@ increment-releasevar: .lastbuild .buildnumber
 
 prod: increment-releasevar push
 
+BBTAGFILE=.tag_bb_$(BB_VERSION)$(TAGSUFFIX)
+BBIMG=$(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
+
+CONFTAGFILE=.tag_conf_$(CONF_VERSION)$(TAGSUFFIX)
+CONFIMG=$(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
+
+JIRATAGFILE=.tag_jira_$(JIRA_VERSION)$(TAGSUFFIX)
+JIRAIMG=$(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
+
+CROWDTAGFILE=.tag_crowd_$(CROWD_VERSION)$(TAGSUFFIX)
+CROWDIMG=$(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
+
+docker-compose.yml: docker-compose.template.yml $(BBTAG) $(CONFTAG) $(JIRATAG) $(CROWDTAG)
+	@sed \
+		-e 's!__BBIMG__!$(BBIMG)!' \
+		-e 's!__CONFIMG__!$(CONFIMG)!' \
+		-e 's!__JIRAIMG__!$(JIRAIMG)!' \
+		-e 's!__CROWDIMG__!$(CROWDIMG)!' < docker-compose.template.yml > $@
+
 .PHONY: push
 push: .push_base .push_bb .push_conf .push_jira .push_crowd
 
@@ -223,40 +242,40 @@ push: .push_base .push_bb .push_conf .push_jira .push_crowd
 	docker push $(HUBDEST)/atlassian-base:$(RELEASE)
 	touch $@
 
-.tag_bb_$(BB_VERSION)$(TAGSUFFIX): .docker_bb_build_$(BB_VERSION)
-	@echo Tagging $(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
-	@docker tag bitbucket:$(BB_VERSION) $(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
+$(BBTAGFILE): .docker_bb_build_$(BB_VERSION)
+	@echo Tagging $(BBIMG)
+	@docker tag bitbucket:$(BB_VERSION) $(BBIMG)
 	@touch $@
 
-.push_bb: .tag_bb_$(BB_VERSION)$(TAGSUFFIX)
-	@docker push $(HUBDEST)/patched-bitbucket:$(BB_VERSION)$(TAGSUFFIX)
+.push_bb: $(BBTAGFILE)
+	@docker push $(BBIMG)
 	@touch $@
 
-.tag_conf_$(CONF_VERSION)$(TAGSUFFIX): .docker_conf_build_$(CONF_VERSION)
-	@echo Tagging $(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
-	@docker tag confluence:$(CONF_VERSION) $(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
+$(CONFTAGFILE): .docker_conf_build_$(CONF_VERSION)
+	@echo Tagging $(CONFIMG)
+	@docker tag confluence:$(CONF_VERSION) $(CONFIMG)
 	@touch $@
 
-.push_conf: .tag_conf_$(CONF_VERSION)$(TAGSUFFIX)
-	@docker push $(HUBDEST)/patched-confluence:$(CONF_VERSION)$(TAGSUFFIX)
+.push_conf: $(CONFTAGFILE)
+	@docker push $(CONFIMG)
 	@touch $@
 
-.tag_jira_$(JIRA_VERSION)$(TAGSUFFIX): .docker_jira_build_$(JIRA_VERSION)
-	@echo Tagging $(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
-	@docker tag jira:$(JIRA_VERSION) $(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
+$(JIRATAGFILE): .docker_jira_build_$(JIRA_VERSION)
+	@echo Tagging $(JIRAIMG)
+	@docker tag jira:$(JIRA_VERSION) $(JIRAIMG)
 	@touch $@
 
-.push_jira: .tag_jira_$(JIRA_VERSION)$(TAGSUFFIX)
-	@docker push $(HUBDEST)/patched-jira:$(JIRA_VERSION)$(TAGSUFFIX)
+.push_jira: $(JIRATAGFILE)
+	@docker push $(JIRAIMG)
 	@touch $@
 
-.tag_crowd_$(CROWD_VERSION)$(TAGSUFFIX): .docker_crowd_build_$(CROWD_VERSION)
-	@echo Tagging $(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
-	@docker tag crowd:$(CROWD_VERSION) $(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
+$(CROWDTAGFILE): .docker_crowd_build_$(CROWD_VERSION)
+	@echo Tagging $(CROWDIMG)
+	@docker tag crowd:$(CROWD_VERSION) $(CROWDIMG)
 	@touch $@
 
-.push_crowd: .tag_crowd_$(CROWD_VERSION)$(TAGSUFFIX)
-	@docker push $(HUBDEST)/patched-crowd:$(CROWD_VERSION)$(TAGSUFFIX)
+.push_crowd: $(CROWDTAGFILE)
+	@docker push $(CROWDIMG)
 	@touch $@
 
 /usr/bin/docker-compose-$(COMPOSERVERSION):

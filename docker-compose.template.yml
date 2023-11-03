@@ -11,7 +11,7 @@ services:
       - "5432:5432"
 
   crowd:
-    image: crowd:4.4.1
+    image: __CROWDIMG__
     environment:
       - "JAVA_OPTS=-Xms512m -Xmx2048m"
       - "CROWD_URL=http://localhost:8095"
@@ -31,7 +31,7 @@ services:
     network_mode: "host"
 
   jira:
-    image: jira:8.22.2
+    image: __JIRAIMG__
     environment:
       - "CATALINA_OPTS=-Djira.downgrade.allowed=false"
       - "JAVA_OPTS=-Xms512m -Xmx2048m"
@@ -44,7 +44,7 @@ services:
       - "8080:8080"
 
   confluence:
-    image: confluence:7.17.1
+    image: __CONFIMG__
     environment:
       - "CONFLUENCE_PROXY_NAME=wiki.xrob.au"
       - "CONFLUENCE_PROXY_PORT=443"
@@ -57,7 +57,7 @@ services:
       - "8091:8091"
 
   bitbucket:
-    image: bitbucket:7.21.0
+    image: __BBIMG__
     environment:
       - "BITBUCKET_PROXY_NAME=git.xrob.au"
       - "BITBUCKET_PROXY_PORT=443"

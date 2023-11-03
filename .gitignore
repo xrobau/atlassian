@@ -5,3 +5,4 @@
 .tag_*
 .create_*
 .uuid
+docker-compose.yml
