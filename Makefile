@@ -16,13 +16,13 @@ HUBDEST=xrobau
 DEFAULT=confluence
 
 # https://www.atlassian.com/software/jira/core/download
-JIRA_VERSION=9.4.0
+JIRA_VERSION=9.11.2
 # https://www.atlassian.com/software/crowd/download-archive
-CROWD_VERSION=5.0.3
+CROWD_VERSION=5.2.0
 # https://www.atlassian.com/software/confluence/download-archives
-CONF_VERSION=7.20.2
+CONF_VERSION=8.6.1
 # https://www.atlassian.com/software/bitbucket/download-archives
-BB_VERSION=8.6.1
+BB_VERSION=8.15.0
 
 JIRA_FILE=atlassian-jira-software-$(JIRA_VERSION)-x64.bin
 JIRA_URL=https://product-downloads.atlassian.com/software/jira/downloads/$(JIRA_FILE)
